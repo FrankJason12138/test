@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My experiment</title>
+  <script src="https://unpkg.com/jspsych@7.0.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.0.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-image-keyboard-response@1.0.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-preload@1.0.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.17.1/dist/xlsx.full.min.js"></script>
+  <link href="https://unpkg.com/jspsych@7.0.0/css/jspsych.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+</body>
+<script>
+
+  /* initialize jsPsych */
+  var jsPsych = initJsPsych({
+    on_finish: function() {
+      var data = jsPsych.data.get().csv();
+      var blob = new Blob([data], {type: "text/csv"});
+      var url = window.URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'experiment_data.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
+  });
+
+  /* create timeline */
+  var timeline = [];
+
+  /* preload images */
+  var preload = {
+    type: jsPsychPreload,
+    images: ['img/blue.png', 'img/orange.png']
+  };
+  timeline.push(preload);
+
+  /* define welcome message trial */
+  var welcome = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: "欢迎来到我的实验，请按任意键继续！"
+  };
+  timeline.push(welcome);
+
+  /* define instructions trial */
+  var instructions = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `
+      <p>在这个实验中，屏幕中央会出现一个圆圈。</p><p>如果这个圆圈是 <strong>蓝色</strong>, 
+      请在第一时间按下 F 这个键.</p>
+      <p>如果这个圆圈是<strong>橙色</strong>, 请在第一时间按下
+      J 这个键</p>
+      <div style='width: 700px;'>
+      <div style='float: left;'><img src='img/blue.png'></img>
+      <p class='small'><strong>按下F键</strong></p></div>
+      <div style='float: right;'><img src='img/orange.png'></img>
+      <p class='small'><strong>按下J键</strong></p></div>
+      </div>
+      <p>请按任意键继续</p>
+    `,
+    post_trial_gap: 2000
+  };
+  timeline.push(instructions);
+
+  /* define trial stimuli array for timeline variables */
+  var test_stimuli = [
+    { stimulus: "img/blue.png",  correct_response: 'f'},
+    { stimulus: "img/orange.png",  correct_response: 'j'}
+  ];
+
+  /* define fixation and test trials */
+  var fixation = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: '<div style="font-size:60px;">+</div>',
+    choices: "NO_KEYS",
+    trial_duration: function(){
+      return jsPsych.randomization.sampleWithoutReplacement([250, 500, 750, 1000, 1250, 1500, 1750, 2000], 1)[0];
+    },
+    data: {
+      task: 'fixation'
+    }
+  };
+
+  var test = {
+    type: jsPsychImageKeyboardResponse,
+    stimulus: jsPsych.timelineVariable('stimulus'),
+    choices: ['f', 'j'],
+    data: {
+      task: 'response',
+      correct_response: jsPsych.timelineVariable('correct_response')
+    },
+    on_finish: function(data){
+      data.correct = jsPsych.pluginAPI.compareKeys(data.response, data.correct_response);
+    }
+  };
+
+  /* define test procedure */
+  var test_procedure = {
+    timeline: [fixation, test],
+    timeline_variables: test_stimuli,
+    repetitions: 5,
+    randomize_order: true
+  };
+  timeline.push(test_procedure);
+
+  /* define debrief */
+  var debrief_block = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: function() {
+
+      var trials = jsPsych.data.get().filter({task: 'response'});
+      var correct_trials = trials.filter({correct: true});
+      var accuracy = Math.round(correct_trials.count() / trials.count() * 100);
+      var rt = Math.round(correct_trials.select('rt').mean());
+
+      return `<p>您在测试中正确率为 ${accuracy}% </p>
+        <p>你的平均反应时 ${rt}ms.</p>
+        <p>感谢您的参与，请按任意键结束实验</p>`;
+
+    }
+  };
+  timeline.push(debrief_block);
+
+  /* start the experiment */
+  jsPsych.run(timeline);
+
+</script>
+</html>
